@@ -171,7 +171,6 @@ namespace Bicep.LanguageServer.Handlers
             }
         }
 
-        private int delay = 10;
         protected override async Task<DocumentLink<Asdfg>> HandleResolve(DocumentLink<Asdfg> request, CancellationToken cancellationToken)
         {
             //asdfg telemetry
@@ -203,129 +202,6 @@ namespace Bicep.LanguageServer.Handlers
                 Trace.WriteLine(ex.Message); //asdfg
                 throw ex; //asdfg
             }
-
-
-
-            string token = new Guid().ToString();
-
-            //asdfg check cap
-
-            Server.Window.SendWorkDoneProgressCreate(new WorkDoneProgressCreateParams() { Token = token });
-
-            //WorkDoneProgressCreateExtensions.SendWorkDoneProgressCreate(Server,new WorkDoneProgressCreateParams() {  new WorkDoneProgressBegin() { Title = "asdfg", });
-
-            Server.Client.SendNotification("$/progress", new ProgressParams() { Token = token, Value = "{kind: \"begin\", title: \"asdfg\"}" });//asdfg  new WorkDoneProgressBegin() { Title = "asdfg", });
-            await Task.Delay(2000);
-
-            ////string token = WorkDoneToken = new Guid().ToString();
-            Server.Client.SendNotification("$/progress", new ProgressParams() { Token=token, Value= "{kind: \"report\", title: \"asdfg\"}" });
-        
-            await Task.Delay(2000);
-
-            Server.SendNotification("$/progress", new WorkDoneProgressReport() { Message = "asdfg 2", Percentage = 20 });
-            await Task.Delay(2000);
-
-            Server.SendNotification("$/progress", new WorkDoneProgressReport() { Message = "asdfg 3", Percentage = 20 });
-            await Task.Delay(2000);
-
-
-
-
-            //          await Task.Delay(1000);
-            //          const dataB: WorkDoneProgressBegin = {
-            //          kind: "begin",
-            //  title: "Loading",
-            //  message: "loading",
-            //  percentage: 0,
-            //};
-            //          await connection.sendNotification("$/progress", { token, value: dataB });
-
-            //          await delay(1000);
-            //          const dataR: WorkDoneProgressReport = {
-            //          kind: "report",
-            //  message: "still loading",
-            //  percentage: 50,
-            //};
-            //          await connection.sendNotification("$/progress", { token, value: dataR });
-
-            //          await delay(1000);
-            //          const dataE: WorkDoneProgressEnd = {
-            //          kind: "end",
-            //};
-            //          await connection.sendNotification("$/progress", { token, value: dataE });
-
-            //Server.SendNotification(new ProgressParams() { Token = request.WorkDoneToken, Value = new WorkDoneProgressBegin() { Title = "asdfg", Percentage = 0 } });
-
-            //// Create a WorkDoneProgress object with a unique token
-            //var progress = new WorkDoneProgressBegin() {  Message = "Starting my task...asdfg", Title = "asdfg" };
-
-
-            //// Send a begin notification with the title and message of the task
-            //await progress.Begin(new WorkDoneProgressBegin
-            //{
-            //    Title = "My Task",
-            //    Message = "Starting my task..."
-            //}, cancellationToken);
-
-            //// Do some work and report the progress
-            //for (int i = 0; i < 100; i++)
-            //{
-            //    await Task.Delay(100, cancellationToken); // Simulate some work
-            //    await progress.Report(new WorkDoneProgressReport
-            //    {
-            //        Message = $"Processing {i + 1}%",
-            //        Percentage = i + 1
-            //    }, cancellationToken);
-            //}
-
-            //// Send an end notification with the message of the task
-            //await progress.End(new WorkDoneProgressEnd
-            //{
-            //    Message = "Finished my task."
-            //}, cancellationToken);
-
-
-
-
-
-            // ProgressExtensions.SendProgress(Server,new ProgressParams() {  Token = new ProgressToken(1), Value = new WorkDoneProgressBegin() { Title = "asdfg", Percentage = 0 } });
-
-            //ProgressExtensions.SendProgress(Server, new WorkDoneProgressBegin
-            //{
-            //    Title = "My Task",
-            ////    Message = "Starting my task..."
-            //});
-            //// Create a WorkDoneProgress object with a unique token
-            //var progress = new WorkDoneProgress(_responseRouter, Guid.NewGuid().ToString());
-
-            //// Send a begin notification with the title and message of the task
-            //await progress.Begin(new WorkDoneProgressBegin
-            //{
-            //    Title = "My Task",
-            //    Message = "Starting my task..."
-            //}, cancellationToken);
-
-            //// Do some work and report the progress
-            //for (int i = 0; i < 100; i++)
-            //{
-            //    await Task.Delay(100, cancellationToken); // Simulate some work
-            //    await progress.Report(new WorkDoneProgressReport
-            //    {
-            //        Message = $"Processing {i + 1}%",
-            //        Percentage = i + 1
-            //    }, cancellationToken);
-            //}
-
-            //// Send an end notification with the message of the task
-            //await progress.End(new WorkDoneProgressEnd
-            //{
-            //    Message = "Finished my task."
-            //}, cancellationToken);
-
-
-
-            // Delay to simulate a long-running operation
-            await Task.Delay(1000 * delay, cancellationToken);
 
             return request with
             {

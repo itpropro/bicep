@@ -2,97 +2,39 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
-using System.Transactions;
-using Azure.Deployments.Core;
 using Bicep.Core.Diagnostics;
 using Bicep.Core.Registry;
 using Bicep.Core.Registry.Oci;
 using Bicep.LanguageServer.Extensions;
-using Bicep.LanguageServer.Providers;
-using OmniSharp.Extensions.JsonRpc;
-using OmniSharp.Extensions.JsonRpc.Server.Messages;
-using OmniSharp.Extensions.LanguageServer.Protocol;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
-using OmniSharp.Extensions.LanguageServer.Protocol.Window;
-using SharpYaml.Tokens;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Bicep.LanguageServer.Handlers
 {
-#nullable disable
-    public partial record Asdfg : IHandlerIdentity
+#nullable disable // The generated code is not yet nullable-aware, this is a temporary fix for that
+    public partial record Asdfg(string TargetArtifactId) : IHandlerIdentity
     {
-        public string TargetArtifactId;
-
-        public Asdfg(string targetArtifactId)
-        {
-            this.TargetArtifactId = targetArtifactId;
-        }
     }
 #nullable restore
 
-    //asdfg
-    //public partial record Data : IHandlerIdentity
-    //{
-    //    public string Name { get; init; }
-    //    public Guid Id { get; init; }
-    //    public string Child { get; init; }
-    //}
-
-    public class BicepDocumentLinkHandler(IModuleDispatcher ModuleDispatcher, ILanguageServerFacade Server)
+    /// <summary>
+    /// This handles the case where the document is a source file from an external module, and we've been asked to return nested links within it (to files local to that module or to other external modules)
+    /// </summary>
+    public class BicepExternalSourceDocumentLinkHandler(IModuleDispatcher ModuleDispatcher)
         : DocumentLinkHandlerBase<Asdfg>
     {
         protected override Task<DocumentLinkContainer<Asdfg>> HandleParams(DocumentLinkParams request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            Trace.WriteLine($"Handling document link: {request.TextDocument.Uri}"); //asdfg
-
-            //using var reporter = Server.ProgressManager.For(
-            //   request, new WorkDoneProgressBegin
-            //   {
-            //       Cancellable = true,
-            //       Message = "This might take a while...",
-            //       Title = "Some long task....",
-            //       Percentage = 0
-            //   },
-            //   cancellationToken
-            //);
-            //await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
-            //reporter.OnNext(
-            //     new WorkDoneProgressReport
-            //     {
-            //         Cancellable = true,
-            //         Percentage = 20
-            //     }
-            // );
-            //await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
-            //reporter.OnNext(
-            //     new WorkDoneProgressReport
-            //     {
-            //         Cancellable = true,
-            //         Percentage = 40
-            //     }
-            // );
-
-            //reporter.OnNext(
-            //      new WorkDoneProgressReport
-            //      {
-            //          Cancellable = true,
-            //          Percentage = 100
-            //      }
-            //  );
-
-            var links = GetDocumentLinksToNestedExternalSourceFiles(ModuleDispatcher, request, cancellationToken);
+            var links = GetDocumentLinks(ModuleDispatcher, request, cancellationToken);
             return Task.FromResult(new DocumentLinkContainer<Asdfg>(links));
-            //request.WorkDoneToken asdfg
-            //request.PartialResultToken asdfg
+        }
 
+        protected override async Task<DocumentLink<Asdfg>> HandleResolve(DocumentLink<Asdfg> request, CancellationToken cancellationToken)
+        {
+            return await ResolveDocumentLink(request, cancellationToken);
         }
 
         protected override DocumentLinkRegistrationOptions CreateRegistrationOptions(DocumentLinkCapability capability, ClientCapabilities clientCapabilities) => new()
@@ -102,10 +44,7 @@ namespace Bicep.LanguageServer.Handlers
             WorkDoneProgress = true,
         };
 
-        /// <summary>
-        /// This handles the case where the document is a source file from an external module, and we've been asked to return nested links within it (to files local to that module or to other external modules)
-        /// </summary>
-        public static IEnumerable<DocumentLink<Asdfg>> GetDocumentLinksToNestedExternalSourceFiles(IModuleDispatcher moduleDispatcher, DocumentLinkParams request, CancellationToken cancellationToken)
+        public static IEnumerable<DocumentLink<Asdfg>> GetDocumentLinks(IModuleDispatcher moduleDispatcher, DocumentLinkParams request, CancellationToken cancellationToken)
         {
             var currentDocument = request.TextDocument;
 
@@ -138,7 +77,6 @@ namespace Bicep.LanguageServer.Handlers
                         yield break;
                     }
 
-                    //asdfg var source currentDocumentSourceArchive.FindExpectedSourceFile(currentDocumentReference.RequestedFile);
                     if (currentDocumentSourceArchive.DocumentLinks.TryGetValue(currentDocumentRelativeFile, out var nestedLinks))
                     {
                         foreach (var nestedLink in nestedLinks)
@@ -147,14 +85,12 @@ namespace Bicep.LanguageServer.Handlers
                             var targetFileInfo = currentDocumentSourceArchive.FindExpectedSourceFile(nestedLink.Target);
                             if (targetFileInfo.SourceArtifactId is { } && targetFileInfo.SourceArtifactId.StartsWith(OciArtifactReferenceFacts.SchemeWithColon)) //asdfg test ignore if not "br:"
                             {
-                                // Yes, it's an external module with source.  Resolve it when clicked so we can attempt to retrieve source.
+                                // Yes, it's an external module with source.  We won't set the target now - we'll wait until the user clicks on it to resolve it.
                                 var sourceId = targetFileInfo.SourceArtifactId.Substring(OciArtifactReferenceFacts.SchemeWithColon.Length);
                                 yield return new DocumentLink<Asdfg>()
                                 {
                                     Range = nestedLink.Range.ToRange(),
                                     Data = new Asdfg(sourceId),
-                                    //Target = new ExternalSourceReference(request.TextDocument.Uri) asdfg
-                                    //    .WithRequestForSourceFile(targetFileInfo.Path).ToUri().ToString(),
                                 };
                             }
 
@@ -171,11 +107,9 @@ namespace Bicep.LanguageServer.Handlers
             }
         }
 
-        protected override async Task<DocumentLink<Asdfg>> HandleResolve(DocumentLink<Asdfg> request, CancellationToken cancellationToken)
+        public async Task<DocumentLink<Asdfg>> ResolveDocumentLink(DocumentLink<Asdfg> request, CancellationToken cancellationToken)
         {
-            //asdfg telemetry
-
-            Trace.WriteLine($"Resolving document link: {request.Target}");
+            Trace.WriteLine($"{nameof(BicepExternalSourceDocumentLinkHandler)}: Resolving document link: {request.Data.TargetArtifactId}");
 
             var data = request.Data;
 
@@ -186,20 +120,24 @@ namespace Bicep.LanguageServer.Handlers
             }
 
             var restoreStatus = ModuleDispatcher.GetArtifactRestoreStatus(targetArtifactReference, out var errorBuilder);
-            Trace.WriteLine($"Restore status: {restoreStatus}"); //asdfg: what about failure?
             if (restoreStatus != ArtifactRestoreStatus.Succeeded)
             {
                 var errorMessage = errorBuilder is { } ? errorBuilder(DiagnosticBuilder.ForDocumentStart()).Message : "The module has not yet been successfully restored.";
-                Trace.WriteLine(errorMessage); //asdfg
+
+                Trace.WriteLine($"  The module has not yet been successfully restored. {errorMessage}"); //asdfg
+
+                // Attempt to restore the module
                 if (!await ModuleDispatcher.RestoreModules(new[] { targetArtifactReference }, forceRestore: true))
                 {
-                    throw new InvalidOperationException("The module has not yet been successfully restored. asdfg");
+                    ModuleDispatcher.GetArtifactRestoreStatus(targetArtifactReference, out errorBuilder);
+                    errorMessage = errorBuilder is { } ? errorBuilder(DiagnosticBuilder.ForDocumentStart()).Message : "Unknown error.";
+                    throw new InvalidOperationException($"Unable to restore module {targetArtifactReference.FullyQualifiedReference}: {errorMessage}");
                 }
             }
 
             if (!ModuleDispatcher.TryGetModuleSources(targetArtifactReference).IsSuccess(out var sourceArchive, out var ex))
             {
-                Trace.WriteLine(ex.Message); //asdfg
+                Trace.WriteLine(ex.Message);
                 throw ex; //asdfg
             }
 

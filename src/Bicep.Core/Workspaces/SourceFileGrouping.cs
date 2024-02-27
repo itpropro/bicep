@@ -1,17 +1,23 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+
 using System.Collections.Immutable;
 using Bicep.Core.Diagnostics;
 using Bicep.Core.Extensions;
 using Bicep.Core.FileSystem;
 using Bicep.Core.Navigation;
+using Bicep.Core.Registry;
 using Bicep.Core.Utils;
 
 namespace Bicep.Core.Workspaces;
 
-public record ArtifactResolutionInfo(
+public record ArtifactResolutionInfo( //asdfg rename?  combine?  How is this and its members actually used?
     IArtifactReferenceSyntax DeclarationSyntax,
     BicepSourceFile SourceFile);
+
+public record ArtifactResolution(
+    Result<Uri, UriResolutionError> UriResult,
+    ArtifactReference? ArtifactReference);
 
 public record UriResolutionError(
     DiagnosticBuilder.ErrorBuilderDelegate ErrorBuilder,
@@ -19,16 +25,23 @@ public record UriResolutionError(
 
 public class SourceFileGrouping : IArtifactFileLookup
 {
+    //asdfg
+
+    // Artifact reference syntax -> ISourceFile or Uri
+    // Uri -> ISourceFile
+
     public SourceFileGrouping(IFileResolver fileResolver,
         Uri entryFileUri,
+        // A dictionary of all source files (or rather the result of attempting to retrieve them), keyed by Uri
         ImmutableDictionary<Uri, ResultWithDiagnostic<ISourceFile>> fileResultByUri,
-        ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, Result<Uri, UriResolutionError>>> fileUriResultByArtifactReference,
+        // For each bicep file key, a dictionary containing all artifact URIs/references in that file, keyed by their module/artifact declaration syntax
+        ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactResolution>> artifactResolutionBySyntax,
         ImmutableDictionary<ISourceFile, ImmutableHashSet<ISourceFile>> sourceFileParentLookup)
     {
         FileResolver = fileResolver;
         EntryFileUri = entryFileUri;
         FileResultByUri = fileResultByUri;
-        FileUriResultByArtifactReference = fileUriResultByArtifactReference;
+        ArtifactResolutionBySyntax = artifactResolutionBySyntax;
         SourceFileParentLookup = sourceFileParentLookup;
     }
 
@@ -36,19 +49,24 @@ public class SourceFileGrouping : IArtifactFileLookup
 
     public Uri EntryFileUri { get; }
 
+    public BicepSourceFile EntryPoint
+        => (FileResultByUri[EntryFileUri].TryUnwrap() as BicepSourceFile) ?? throw new InvalidOperationException($"{nameof(EntryFileUri)} is not a Bicep source file!");
+
+    public IEnumerable<ISourceFile> SourceFiles => FileResultByUri.Values.Select(x => x.IsSuccess(out var success) ? success : null).WhereNotNull();
+
     public ImmutableDictionary<Uri, ResultWithDiagnostic<ISourceFile>> FileResultByUri { get; }
 
-    public ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, Result<Uri, UriResolutionError>>> FileUriResultByArtifactReference { get; }
+    public ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactResolution>> ArtifactResolutionBySyntax { get; }
 
     public ImmutableDictionary<ISourceFile, ImmutableHashSet<ISourceFile>> SourceFileParentLookup { get; }
 
     public IEnumerable<ArtifactResolutionInfo> GetArtifactsToRestore(bool force = false)
     {
-        foreach (var (sourceFile, artifactResults) in FileUriResultByArtifactReference)
+        foreach (var (sourceFile, artifactResults) in ArtifactResolutionBySyntax)
         {
             foreach (var (syntax, result) in artifactResults)
             {
-                if (force || !result.IsSuccess(out _, out var failure) && failure.RequiresRestore)
+                if (force || !result.UriResult.IsSuccess(out _, out var failure) && failure.RequiresRestore)
                 {
                     yield return new(syntax, sourceFile);
                 }
@@ -56,17 +74,12 @@ public class SourceFileGrouping : IArtifactFileLookup
         }
     }
 
-    public BicepSourceFile EntryPoint
-        => (FileResultByUri[EntryFileUri].TryUnwrap() as BicepSourceFile) ?? throw new InvalidOperationException($"{nameof(EntryFileUri)} is not a Bicep source file!");
+    public ResultWithDiagnostic<ISourceFile> TryGetSourceFileForSyntax(IArtifactReferenceSyntax foreignTemplateReferenceSyntax)
+        => TryGetFileUriForReferenceSyntax(foreignTemplateReferenceSyntax).IsSuccess(out var fileUri, out var errorBuilder) ? FileResultByUri[fileUri] : new(errorBuilder);
 
-    public IEnumerable<ISourceFile> SourceFiles => FileResultByUri.Values.Select(x => x.IsSuccess(out var success) ? success : null).WhereNotNull();
-
-    public ResultWithDiagnostic<ISourceFile> TryGetSourceFile(IArtifactReferenceSyntax foreignTemplateReference)
-        => TryGetResourceTypesFileUri(foreignTemplateReference).IsSuccess(out var fileUri, out var errorBuilder) ? FileResultByUri[fileUri] : new(errorBuilder);
-
-    public ResultWithDiagnostic<Uri> TryGetResourceTypesFileUri(IArtifactReferenceSyntax foreignTemplateReference)
+    public ResultWithDiagnostic<Uri> TryGetFileUriForReferenceSyntax(IArtifactReferenceSyntax foreignTemplateReferenceSyntax)
     {
-        var uriResult = FileUriResultByArtifactReference.Values.Select(d => d.TryGetValue(foreignTemplateReference, out var result) ? result : null).WhereNotNull().First();
+        var uriResult = ArtifactResolutionBySyntax.Values.Select(d => d.TryGetValue(foreignTemplateReferenceSyntax, out var result) ? result : null).WhereNotNull().First().UriResult;
         if (!uriResult.IsSuccess(out var fileUri, out var error))
         {
             return new(error.ErrorBuilder);

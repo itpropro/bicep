@@ -31,23 +31,19 @@ public static class SourceCodeDocumentLinkHelper
     {
         var dictionary = new Dictionary<Uri, SourceCodeDocumentUriLink[]>();
 
-        foreach (var sourceAndDictPair in sourceFileGrouping.ArtifactResolutionPerFileBySyntax)
+        foreach (var (referencingFile, referenceSyntaxToArtifactResolution)  in sourceFileGrouping.ArtifactResolutionPerFileBySyntax)
         {
-            ISourceFile referencingFile = sourceAndDictPair.Key;
-            IDictionary<IArtifactReferenceSyntax, ArtifactUriResolution> referenceSyntaxToArtifactResolution = sourceAndDictPair.Value;
-
             var referencingFileLineStarts = TextCoordinateConverter.GetLineStarts(referencingFile.GetOriginalSource());
 
             var linksForReferencingFile = new List<SourceCodeDocumentUriLink>();
 
-            foreach (var entry in referenceSyntaxToArtifactResolution)
+            foreach (var (syntax, resolutionResult) in referenceSyntaxToArtifactResolution)
             {
-                IArtifactReferenceSyntax syntax = entry.Key;
-                Result<Uri, UriResolutionError> uriResult = entry.Value.UriResult;
-                ArtifactReference? externalArtifactReference = entry.Value.ArtifactReference; //asdfg not used hmm
-
-                if (syntax.Path is { } && uriResult.IsSuccess(out var uri))
+                if (syntax.Path is { } && resolutionResult.IsSuccess(out var resolution))
                 {
+                    Uri uri = resolution.Uri;
+                    //ArtifactReference? externalArtifactReference = resolution.ArtifactReference; //asdfg not used hmm
+
                     var start = new SourceCodePosition(TextCoordinateConverter.GetPosition(referencingFileLineStarts, syntax.Path.Span.Position));
                     var end = new SourceCodePosition(TextCoordinateConverter.GetPosition(referencingFileLineStarts, syntax.Path.Span.Position + syntax.Path.Span.Length));
 

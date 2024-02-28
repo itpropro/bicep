@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -181,21 +182,22 @@ namespace Bicep.Core.SourceCode
             //asdfg test distinct
             //sourceFileGrouping.TryGetUriForArtifactReferenceSyntax
             //asdfg
-            var sourceFiles = sourceFileGrouping.SourceFiles.ToArray();
-            var artifactResolutions = sourceFileGrouping.ArtifactResolutionPerFileBySyntax.Values.SelectMany(x => x.Values);
-            var artifactResolutions2 = artifactResolutions.DistinctArray();
-            var artifactResolution3 = artifactResolutions2.Where(x => x.UriResult.TryUnwrap() is not null && x.ArtifactReference is OciArtifactReference).ToArray();
-            var a = artifactResolutions2.Select(x => (x.UriResult.Unwrap(), x.ArtifactReference?.UnqualifiedReference)).ToArray();
-            var b = artifactResolutions.WhereNotNull()
-                .Distinct(x => x.UriResult.Unwrap().ToString());
+            //var sourceFiles = sourceFileGrouping.SourceFiles.ToArray();
+            IEnumerable<Result<ArtifactUriResolution, UriResolutionError>> artifactResolutions = sourceFileGrouping.ArtifactResolutionPerFileBySyntax.Values.SelectMany(x => x.Values);
+            //var artifactResolutions2 = artifactResolutions.DistinctArray();
+            //var artifactResolution3 = artifactResolutions2.Where(x => x.UriResult.TryUnwrap() is not null && x.ArtifactReference is OciArtifactReference).ToArray();
+            //var a = artifactResolutions2.Select(x => (x.UriResult.Unwrap(), x.ArtifactReference?.UnqualifiedReference)).ToArray();
+            var b = artifactResolutions.Select(x => x.TryUnwrap())
+                .WhereNotNull()
+                .Distinct(x => x.Uri.ToString());
             // Only want OCI references  //asdfg test
             // Only those that have source themselves
             var c = b.Where(x => x.ArtifactReference is OciArtifactReference && moduleDispatcher.TryGetModuleSources(x.ArtifactReference).IsSuccess()).ToArray();
 
-            var artifactByUri = c.ToDictionary(x => x.UriResult.Unwrap(), x => x.ArtifactReference); // Only want OCI references  //asdfg test
+            var artifactByUri = c.ToDictionary(x => x.Uri, x => x.ArtifactReference); // Only want OCI references  //asdfg test
 
-
-            var sourceFilesWithArtifactReference = sourceFiles.Select(x => new SourceFileWithArtifactReference(x, artifactByUri.GetValueOrDefault(x.FileUri))).ToArray();
+            var sourceFilesWithArtifactReference = sourceFileGrouping.SourceFiles
+                .Select(x => new SourceFileWithArtifactReference(x, artifactByUri.GetValueOrDefault(x.FileUri))).ToArray();
 
             var documentLinks = SourceCodeDocumentLinkHelper.GetAllModuleDocumentLinks(sourceFileGrouping);
             return PackSourcesIntoStream(sourceFileGrouping.EntryFileUri, cacheRoot, documentLinks, sourceFilesWithArtifactReference.ToArray());

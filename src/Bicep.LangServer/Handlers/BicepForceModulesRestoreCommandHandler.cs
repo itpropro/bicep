@@ -70,7 +70,7 @@ namespace Bicep.LanguageServer.Handlers
 
             var artifactUris = sourceFileGrouping
                 .ArtifactResolutionPerFileBySyntax.SelectMany(x => x.Value)
-                .Select(x => x.Value.UriResult.TryUnwrap())
+                .Select(x => x.Value.TryUnwrap()?.Uri)
                 .WhereNotNull()
                 .Distinct();
 

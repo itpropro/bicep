@@ -750,12 +750,12 @@ namespace Bicep.Core.UnitTests.Registry
         {
             var (OciArtifactRegistry, _, parentModuleUri) = CreateModuleRegistryAndBicepFile(parentBicepFileContents, true);
 
-            OciArtifactReference? OciArtifactReference = OciRegistryHelper.CreateModuleReference(
+            OciArtifactReference? OciArtifactReference = OciRegistryHelper.CreateModuleReferenceMock(
                 registry,
                 repository,
+                parentModuleUri,
                 digest,
-                tag,
-                parentModuleUri);
+                tag);
 
             if (manifestFileContents is string)
             {

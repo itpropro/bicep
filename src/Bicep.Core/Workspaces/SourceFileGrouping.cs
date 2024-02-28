@@ -15,9 +15,9 @@ public record ArtifactResolutionInfo( //asdfg rename?  combine?  How is this and
     IArtifactReferenceSyntax DeclarationSyntax,
     BicepSourceFile SourceFile);
 
-public record ArtifactResolution(
-    Result<Uri, UriResolutionError> UriResult,
-    ArtifactReference? ArtifactReference);
+public record ArtifactUriResolution(
+    ArtifactReference ArtifactReference,
+    Uri Uri);
 
 public record UriResolutionError(
     DiagnosticBuilder.ErrorBuilderDelegate ErrorBuilder,
@@ -35,13 +35,13 @@ public class SourceFileGrouping : IArtifactFileLookup
         // A dictionary of all source files (or rather the result of attempting to retrieve them), keyed by Uri
         ImmutableDictionary<Uri, ResultWithDiagnostic<ISourceFile>> fileResultByUri,
         // For each bicep file key, a dictionary containing all artifact URIs/references in that file, keyed by their module/artifact declaration syntax
-        ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactResolution>> artifactResolutionBySyntax,
+        ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactUriResolution>> artifactResolutionPerFileBySyntax,
         ImmutableDictionary<ISourceFile, ImmutableHashSet<ISourceFile>> sourceFileParentLookup)
     {
         FileResolver = fileResolver;
         EntryFileUri = entryFileUri;
         FileResultByUri = fileResultByUri;
-        ArtifactResolutionBySyntax = artifactResolutionBySyntax;
+        ArtifactResolutionPerFileBySyntax = artifactResolutionPerFileBySyntax;
         SourceFileParentLookup = sourceFileParentLookup;
     }
 
@@ -56,13 +56,13 @@ public class SourceFileGrouping : IArtifactFileLookup
 
     public ImmutableDictionary<Uri, ResultWithDiagnostic<ISourceFile>> FileResultByUri { get; }
 
-    public ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactResolution>> ArtifactResolutionBySyntax { get; }
+    public ImmutableDictionary<BicepSourceFile, ImmutableDictionary<IArtifactReferenceSyntax, ArtifactUriResolution>> ArtifactResolutionPerFileBySyntax { get; }
 
     public ImmutableDictionary<ISourceFile, ImmutableHashSet<ISourceFile>> SourceFileParentLookup { get; }
 
     public IEnumerable<ArtifactResolutionInfo> GetArtifactsToRestore(bool force = false)
     {
-        foreach (var (sourceFile, artifactResults) in ArtifactResolutionBySyntax)
+        foreach (var (sourceFile, artifactResults) in ArtifactResolutionPerFileBySyntax)
         {
             foreach (var (syntax, result) in artifactResults)
             {
@@ -79,7 +79,7 @@ public class SourceFileGrouping : IArtifactFileLookup
 
     public ResultWithDiagnostic<Uri> TryGetFileUriForReferenceSyntax(IArtifactReferenceSyntax foreignTemplateReferenceSyntax)
     {
-        var uriResult = ArtifactResolutionBySyntax.Values.Select(d => d.TryGetValue(foreignTemplateReferenceSyntax, out var result) ? result : null).WhereNotNull().First().UriResult;
+        var uriResult = ArtifactResolutionPerFileBySyntax.Values.Select(d => d.TryGetValue(foreignTemplateReferenceSyntax, out var result) ? result : null).WhereNotNull().First().UriResult;
         if (!uriResult.IsSuccess(out var fileUri, out var error))
         {
             return new(error.ErrorBuilder);

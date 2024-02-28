@@ -23,7 +23,7 @@ namespace Bicep.Core.Workspaces
         private readonly IReadOnlyWorkspace workspace;
 
         private readonly Dictionary<Uri, ResultWithDiagnostic<ISourceFile>> fileResultByUri;
-        private readonly ConcurrentDictionary<BicepSourceFile, Dictionary<IArtifactReferenceSyntax, ArtifactResolution>> artifactResolutionBySyntax;
+        private readonly ConcurrentDictionary<BicepSourceFile, Dictionary<IArtifactReferenceSyntax, ArtifactResolution>> ArtifactResolutionPerFileBySyntax;
 
         private readonly bool forceRestore;
 
@@ -36,7 +36,7 @@ namespace Bicep.Core.Workspaces
             this.fileResolver = fileResolver;
             this.dispatcher = moduleDispatcher;
             this.workspace = workspace;
-            this.artifactResolutionBySyntax = new();
+            this.ArtifactResolutionPerFileBySyntax = new();
             this.fileResultByUri = new();
             this.forceRestore = forceModulesRestore;
         }
@@ -51,7 +51,7 @@ namespace Bicep.Core.Workspaces
             this.fileResolver = fileResolver;
             this.dispatcher = moduleDispatcher;
             this.workspace = workspace;
-            this.artifactResolutionBySyntax = new(current.ArtifactResolutionBySyntax.Select(kvp => KeyValuePair.Create(kvp.Key, kvp.Value.ToDictionary(p => p.Key, p => p.Value))));
+            this.ArtifactResolutionPerFileBySyntax = new(current.ArtifactResolutionPerFileBySyntax.Select(kvp => KeyValuePair.Create(kvp.Key, kvp.Value.ToDictionary(p => p.Key, p => p.Value))));
             this.fileResultByUri = current.FileResultByUri.Where(x => x.Value.TryUnwrap() is not null).ToDictionary(x => x.Key, x => x.Value);
             this.forceRestore = forceArtifactRestore;
         }
@@ -71,10 +71,10 @@ namespace Bicep.Core.Workspaces
 
             foreach (var (module, sourceFile) in modulesToRestore)
             {
-                builder.artifactResolutionBySyntax[sourceFile].Remove(module);
+                builder.ArtifactResolutionPerFileBySyntax[sourceFile].Remove(module);
             }
 
-            // Rebuild source files that contain external module references restored during the inital build.
+            // Rebuild source files that contain external module references restored during the initial build.
             var sourceFilesToRebuild = current.SourceFiles.OfType<BicepSourceFile>()
                 .Where(sourceFile
                     => GetArtifactReferenceDeclarations(sourceFile)
@@ -104,7 +104,7 @@ namespace Bicep.Core.Workspaces
                 fileResolver,
                 entryFileUri,
                 fileResultByUri.ToImmutableDictionary(),
-                artifactResolutionBySyntax.ToImmutableDictionary(kvp => kvp.Key, kvp => kvp.Value.ToImmutableDictionary()),
+                ArtifactResolutionPerFileBySyntax.ToImmutableDictionary(kvp => kvp.Key, kvp => kvp.Value.ToImmutableDictionary()),
                 sourceFileDependencies.InvertLookup().ToImmutableDictionary());
         }
 
@@ -152,7 +152,7 @@ namespace Bicep.Core.Workspaces
             foreach (var restorable in file.ProgramSyntax.Children.OfType<IArtifactReferenceSyntax>())
             {
                 var (childArtifactReference, uriResult) = GetArtifactRestoreResult(file.FileUri, restorable);
-                artifactResolutionBySyntax.GetOrAdd(file, f => new())[restorable] = new ArtifactResolution(uriResult, childArtifactReference);
+                ArtifactResolutionPerFileBySyntax.GetOrAdd(file, f => new())[restorable] = new ArtifactResolution(uriResult, childArtifactReference);
 
                 if (!uriResult.IsSuccess(out var artifactUri))
                 {
@@ -172,23 +172,23 @@ namespace Bicep.Core.Workspaces
             }
         }
 
-        private (ArtifactReference? reference, Result<Uri, UriResolutionError> result) GetArtifactRestoreResult(Uri parentFileUri, IArtifactReferenceSyntax referenceSyntax)
+        private Result<ArtifactResolution, UriResolutionError> GetArtifactRestoreResult(Uri parentFileUri, IArtifactReferenceSyntax referenceSyntax)
         {
             if (!dispatcher.TryGetArtifactReference(referenceSyntax, parentFileUri).IsSuccess(out var artifactReference, out var referenceResolutionError))
             {
                 // module reference is not valid
-                return (null/*asdfg put this into result with uri*/, new(new UriResolutionError(referenceResolutionError, false)));
+                return new Result<ArtifactResolution, UriResolutionError>(new UriResolutionError(referenceResolutionError, false));
             }
 
             if (!dispatcher.TryGetLocalArtifactEntryPointUri(artifactReference).IsSuccess(out var artifactFileUri, out var artifactGetPathFailureBuilder))
             {
-                return (null, new(new UriResolutionError(artifactGetPathFailureBuilder, false)));
+                return new Result<ArtifactResolution, UriResolutionError>(new UriResolutionError(artifactGetPathFailureBuilder, false));
             }
 
             if (forceRestore)
             {
                 //override the status to force restore
-                return (null, new(new UriResolutionError(x => x.ArtifactRequiresRestore(artifactReference.FullyQualifiedReference), true)));
+                return new Result<ArtifactResolution, UriResolutionError>(new UriResolutionError(x => x.ArtifactRequiresRestore(artifactReference.FullyQualifiedReference), true));
             }
 
             var restoreStatus = dispatcher.GetArtifactRestoreStatus(artifactReference, out var restoreErrorBuilder);
@@ -196,16 +196,16 @@ namespace Bicep.Core.Workspaces
             {
                 case ArtifactRestoreStatus.Unknown:
                     // we have not yet attempted to restore the module, so let's do it
-                    return (null, new(new UriResolutionError(x => x.ArtifactRequiresRestore(artifactReference.FullyQualifiedReference), true)));
+                    return new Result<ArtifactResolution, UriResolutionError>(new UriResolutionError(x => x.ArtifactRequiresRestore(artifactReference.FullyQualifiedReference), true));
                 case ArtifactRestoreStatus.Failed:
                     // the module has not yet been restored or restore failed
                     // in either case, set the error
-                    return (null, new(new UriResolutionError(restoreErrorBuilder ?? (x => x.ArtifactRestoreFailed(artifactReference.FullyQualifiedReference)), false)));
+                    return new Result<ArtifactResolution, UriResolutionError>(new UriResolutionError(restoreErrorBuilder ?? (x => x.ArtifactRestoreFailed(artifactReference.FullyQualifiedReference)), false));
                 default:
                     break;
             }
 
-            return (artifactReference, new(artifactFileUri));
+            return new Result<ArtifactResolution, UriResolutionError>(new ArtifactResolution(artifactReference, artifactFileUri)); ;
         }
 
         private ILookup<ISourceFile, ISourceFile> ReportFailuresForCycles()
@@ -214,7 +214,7 @@ namespace Bicep.Core.Workspaces
                 .Select(x => x.TryUnwrap())
                 .WhereNotNull()
                 .SelectMany(sourceFile => GetReferenceSourceNodes(sourceFile)
-                    .SelectMany(moduleDeclaration => this.artifactResolutionBySyntax.Values.Select(f => f.TryGetValue(moduleDeclaration)?.UriResult. TryUnwrap()))
+                    .SelectMany(moduleDeclaration => this.ArtifactResolutionPerFileBySyntax.Values.Select(f => f.TryGetValue(moduleDeclaration)?.UriResult.TryUnwrap()))
                     .WhereNotNull()
                     .Select(fileUri => this.fileResultByUri[fileUri].TryUnwrap())
                     .WhereNotNull()
@@ -223,7 +223,7 @@ namespace Bicep.Core.Workspaces
                 .ToLookup(x => x.sourceFile, x => x.referencedFile);
 
             var cycles = CycleDetector<ISourceFile>.FindCycles(sourceFileGraph);
-            foreach (var (file, artifactResolutionByModuleForFile) in artifactResolutionBySyntax)
+            foreach (var (file, artifactResolutionByModuleForFile) in ArtifactResolutionPerFileBySyntax)
             {
                 foreach (var (statement, artifactResolution) in artifactResolutionByModuleForFile)
                 {

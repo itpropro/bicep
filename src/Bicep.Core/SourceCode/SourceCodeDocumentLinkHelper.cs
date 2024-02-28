@@ -31,10 +31,10 @@ public static class SourceCodeDocumentLinkHelper
     {
         var dictionary = new Dictionary<Uri, SourceCodeDocumentUriLink[]>();
 
-        foreach (var sourceAndDictPair in sourceFileGrouping.ArtifactResolutionBySyntax)
+        foreach (var sourceAndDictPair in sourceFileGrouping.ArtifactResolutionPerFileBySyntax)
         {
             ISourceFile referencingFile = sourceAndDictPair.Key;
-            IDictionary<IArtifactReferenceSyntax, ArtifactResolution> referenceSyntaxToArtifactResolution = sourceAndDictPair.Value;
+            IDictionary<IArtifactReferenceSyntax, ArtifactUriResolution> referenceSyntaxToArtifactResolution = sourceAndDictPair.Value;
 
             var referencingFileLineStarts = TextCoordinateConverter.GetLineStarts(referencingFile.GetOriginalSource());
 

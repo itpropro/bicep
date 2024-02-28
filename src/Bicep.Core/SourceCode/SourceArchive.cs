@@ -182,7 +182,7 @@ namespace Bicep.Core.SourceCode
             //sourceFileGrouping.TryGetUriForArtifactReferenceSyntax
             //asdfg
             var sourceFiles = sourceFileGrouping.SourceFiles.ToArray();
-            var artifactResolutions = sourceFileGrouping.ArtifactResolutionBySyntax.Values.SelectMany(x => x.Values);
+            var artifactResolutions = sourceFileGrouping.ArtifactResolutionPerFileBySyntax.Values.SelectMany(x => x.Values);
             var artifactResolutions2 = artifactResolutions.DistinctArray();
             var artifactResolution3 = artifactResolutions2.Where(x => x.UriResult.TryUnwrap() is not null && x.ArtifactReference is OciArtifactReference).ToArray();
             var a = artifactResolutions2.Select(x => (x.UriResult.Unwrap(), x.ArtifactReference?.UnqualifiedReference)).ToArray();

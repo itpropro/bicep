@@ -1,9 +1,10 @@
-import styled from "styled-components";
-import useDrag from "../hooks/useDrag";
 
 import type { PropsWithChildren } from "react";
+import styled from "styled-components";
+
 import type { Transient } from "./types";
 import type { Dimension, Position } from "../core/types";
+import useDrag from "../hooks/useDrag";
 
 export type NodeProps = PropsWithChildren<{
   id: string;

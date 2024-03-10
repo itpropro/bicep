@@ -2,8 +2,8 @@ import { DragEvent } from "react";
 import { styled } from "styled-components";
 
 import { Graph } from "./Graph";
-import { store } from "../store";
 import usePanZoom from "../hooks/usePanZoom";
+import { graphStore } from "../store/graph-slice";
 
 const $Canvas = styled.div`
   position: absolute;
@@ -18,7 +18,7 @@ let nodeId = 0;
 
 export default function Canvas() {
   const canvasRef = usePanZoom();
-  const addNode = store.use.graph().addNode;
+  const addNode = graphStore.use.graph().addNode;
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();

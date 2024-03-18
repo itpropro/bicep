@@ -3,7 +3,7 @@ import { styled } from "styled-components";
 
 import { Graph } from "./Graph";
 import usePanZoom from "../hooks/usePanZoom";
-import { graphStore } from "../store/graph-slice";
+import { graphStore } from "../stores/graph-slice";
 
 const $Canvas = styled.div`
   position: absolute;

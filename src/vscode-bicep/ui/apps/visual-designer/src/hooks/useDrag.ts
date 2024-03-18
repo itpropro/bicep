@@ -2,7 +2,7 @@ import { D3DragEvent, SubjectPosition, drag } from "d3-drag";
 import { select } from "d3-selection";
 import { useEffect, useRef } from "react";
 
-import { graphStore } from "../store/graph-slice";
+import { graphStore } from "../stores/graph-slice";
 
 export default function useDrag(nodeId: string) {
   const elementRef = useRef<HTMLDivElement>(null);

@@ -30,15 +30,22 @@ export interface GraphState {
   addNode: (nodeId: string, position: Position) => void;
 }
 
+export type EdgeType = "Straight" | "Bezier" | "Elbow";
+
+export type NodeType = "Compact" | "Informative";
+
 export interface ConfigState {
-  edgeType: "Straight" | "Bezier" | "Elbow";
-  nodeType: "Compact" | "Informative";
+  edgeType: EdgeType;
+  nodeType: NodeType;
+
+  setEdgeType: (edgeType: "Straight" | "Bezier" | "Elbow") => void;
+  setNodeType: (nodeType: "Compact" | "Informative") => void;
 }
 
 export interface AppState {
   theme: "Default" | "Dark" | "Light" | "HighContrast";
   graph: GraphState;
-  graphConfig: ConfigState;
+  config: ConfigState;
 }
 
 export type ImmerStateCreator<T> = StateCreator<AppState, [["zustand/immer", never], never], [], T>;

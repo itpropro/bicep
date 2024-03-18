@@ -2,7 +2,7 @@ import styled from "styled-components";
 
 import { Edge } from "./Edge";
 import { Node } from "./Node";
-import { graphStore } from "../store/graph-slice";
+import { graphStore } from "../stores/graph-slice";
 
 const $Graph = styled.div.attrs<{
   $x: number;

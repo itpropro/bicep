@@ -2,7 +2,7 @@ import { select } from "d3-selection";
 import { D3ZoomEvent, zoom } from "d3-zoom";
 import { useEffect, useRef } from "react";
 
-import { graphStore } from "../store/graph-slice";
+import { graphStore } from "../stores/graph-slice";
 
 export default function usePanZoom<T extends Element = HTMLDivElement>() {
   const containerRef = useRef<T>(null);
